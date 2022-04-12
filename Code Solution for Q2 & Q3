@@ -1,0 +1,79 @@
+--Q2 and Q3 are answered using T-SQL in the MS SQL Server
+--SECOND QUESTION
+create database Bar
+select * from bar.dbo.brands
+select * from bar.dbo.users
+select * from bar.dbo.receipts
+
+--Q: Which brand has the most spend among users who were created within the past 6 months?
+
+-- I assume the metric for the date column is millisecond and convert into day (there are 86410958.9041065425 milliseconds in a day).
+-- I assume the latest user account is created TODAY and subselected all the user whose accounts were created 180 days before the latest account.
+-- Null brands are automatically removed and not considered in this question.
+select b.brandCode,
+sum(totalSpent) as spend
+from bar.dbo.users u full outer join bar.dbo.receipts r
+on u.id_oid = r.userId
+full outer join bar.dbo.brands b on b.brandCode = r.rewardsReceiptItemList_brandCode
+where b.brandCode is not null and totalSpent is not null and 
+	u.createdDate_date >= (select max(createdDate_date) from bar.dbo.users) - 180*86410958.9041065425
+group by b.brandCode
+order by 2 desc
+
+--A: Pepsi has the most spend among users who were created within the past 6 months
+
+--Q: Which brand has the most transactions among users who were created within the past 6 months?
+
+select b.name, count(r.ID) as trans_cnt
+from bar.dbo.brands b full outer join bar.dbo.receipts r
+on b.brandCode = r.rewardsReceiptItemList_brandCode
+full outer join bar.dbo.users u
+on u.id_oid = r.userId
+where u.createdDate_date >= (select max(createdDate_date) from bar.dbo.users) - 180*86410958.9041065425
+and brandCode is not Null
+group by b.name
+order by trans_cnt desc
+
+--A: Pepsi has the most transactions among users who were created within the past 6 months
+
+--Q: When considering average spend from receipts with 'rewardsReceiptStatus’ of ‘Accepted’ or ‘Rejected’, which is greater?
+--There is no "Accepted" as receipt status - I used "Finished" in lieu of that
+select * from
+(select avg(totalSpent) as Spend_Accepted from bar.dbo.receipts r
+where upper(rewardsReceiptStatus) = 'FINISHED') f,
+(select avg(totalSpent) as Spend_Rejected from bar.dbo.receipts r
+where upper(rewardsReceiptStatus) = 'REJECTED') r
+
+--A: Average spend is greater for the receipts with "Finished" status
+
+--Q: When considering total number of items purchased from receipts with 
+--'rewardsReceiptStatus’ of ‘Accepted’ or ‘Rejected’, which is greater?
+select * from
+(select count(*) as Items_Accepted from bar.dbo.receipts r
+where upper(rewardsReceiptStatus) = 'FINISHED') f,
+(select count(*) as Items_Rejected from bar.dbo.receipts r
+where upper(rewardsReceiptStatus) = 'REJECTED') r
+
+--A: Total number of items accepted is higher
+
+
+--THIRD QUESTION
+--There are large number of NULL values in the joining fields including brandCode for the receipts table.
+--There are also null values in the primary key (receipt ID) and foreign key (user ID) in the receipt table which undermines data quality while referencing data.
+--The interpretation of date columns is subjective to the user (e.g. converting milli-esconds to days in my solution)
+SELECT id_oid, 'missing_brand' AS reason
+FROM bar.dbo.brands
+WHERE brandCode IS NULL
+
+--Duplicate user ID that violates the primary key constraint
+SELECT id_oid, 'duplicate_id' AS reason
+FROM (
+    SELECT id_oid, count(id_oid) AS count
+    FROM bar.dbo.users
+    GROUP BY id_oid
+) h
+WHERE count > 1
+
+
+--FOURTH QUESTION
+--Please see the other file for my response.
